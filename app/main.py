@@ -1,11 +1,36 @@
-# app/main.py
-
 from datetime import datetime
 import time
 from fastapi import FastAPI, Request
-from app.api.v1.endpoints.play import router as play_router
+from fastapi.middleware.cors import CORSMiddleware
+from app.core.config import settings
+from app.db.mongodb import connect_to_mongo, close_mongo_connection
+from app.db.redis import connect_to_redis, close_redis_connection
+from app.api.v1.endpoints.user import router as user_router
+from app.api.v1.endpoints.admin import router as admin_router
+from app.core.scheduler import start_scheduler
 
-app = FastAPI()
+app = FastAPI(title=settings.PROJECT_NAME)
+
+# 配置CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.BACKEND_CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.on_event("startup")
+async def startup_db_client():
+    await connect_to_mongo()
+    await connect_to_redis()
+    # 启动定时任务
+    start_scheduler()
+
+@app.on_event("shutdown")
+async def shutdown_db_client():
+    await close_mongo_connection()
+    await close_redis_connection()
 
 @app.get("/")
 async def read_root():
@@ -19,11 +44,11 @@ async def log_requests(request: Request, call_next):
     print(f"{current_time} - {request.method} {request.url.path} - Body: {request_body.decode('utf-8')}")
     response = await call_next(request)
     return response
-# 包含 play.py 中的路由
-app.include_router(play_router, prefix="/api/v1")
 
-# 如果你想在本地运行这个应用程序，可以使用以下代码
-# 在终端中运行：uvicorn app.main:app --reload
+# 包含路由
+app.include_router(user_router, prefix="/api/v1/users", tags=["users"])
+app.include_router(admin_router, prefix="/api/v1/admin", tags=["admin"])
+# uvicorn app.main:app --host 0.0.0.0 --port 8003 --reload
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8003)
