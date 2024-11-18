@@ -27,6 +27,9 @@ class UserResponseData(BaseModel):
     is_admin: bool
     created_at: datetime
     updated_at: datetime
+    current_total_up_points:int
+    current_total_down_points:int
+    
 
 class UserResponse(BaseModel):
     code: int

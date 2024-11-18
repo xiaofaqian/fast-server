@@ -80,12 +80,13 @@ class UserService:
                 "updated_at": now,
                 "last_active": now
             }
-            
+            print(user_dict)
             result = await self.users_collection.insert_one(user_dict)
             if not result.inserted_id:
+                print("Failed to create user")
                 raise Exception("Failed to create user")
-                
-            return UserInDB(**user_dict)
+            user_dict = await self.users_collection.find_one({"_id": result.inserted_id})    
+            return user_dict
         except ValueError as e:
             raise e
         except Exception as e:
@@ -130,7 +131,9 @@ class UserService:
                 is_admin=user_data.get("is_admin", False),
                 created_at=user_data.get("created_at", datetime.utcnow()),
                 updated_at=user_data.get("updated_at", datetime.utcnow()),
-                last_active=user_data.get("last_active", datetime.utcnow())
+                last_active=user_data.get("last_active", datetime.utcnow()),
+                current_total_up_points = user_data.get("current_total_up_points", 0),
+                current_total_down_points = user_data.get("current_total_down_points", 0),
             )
         except JWTError:
             return None
@@ -180,4 +183,21 @@ class UserService:
             return result.modified_count > 0
         except Exception as e:
             print(f"Error updating user active status: {e}")
+            return False
+
+    async def clearRecord(current_user: User):
+        try:
+            db = get_database()
+            result = await db.users.update_one(
+                {"username": current_user.username},
+                {
+                    "$set": {
+                        'current_total_up_points':0,
+                        'current_total_down_points':0
+                    }
+                }
+            )
+            return result.modified_count > 0
+        except Exception as e:
+            print(f"Error clearing user record: {e}")
             return False

@@ -33,6 +33,8 @@ class User(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     last_active: datetime = Field(default_factory=datetime.utcnow)  # 添加最后活跃时间字段
+    current_total_up_points: int = Field(default=0.0, description='总上分点数')
+    current_total_down_points: int = Field(default=0.0, description='总下分点数')
 
     model_config = {
         "populate_by_name": True,
@@ -51,7 +53,9 @@ class UserInDB(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     last_active: datetime = Field(default_factory=datetime.utcnow)  # 添加最后活跃时间字段
-
+    current_total_up_points: int = Field(default=0.0, description='总上分点数')
+    current_total_down_points: int = Field(default=0.0, description='总下分点数')
+    
     model_config = {
         "populate_by_name": True,
         "arbitrary_types_allowed": True,

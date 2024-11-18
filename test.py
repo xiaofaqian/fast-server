@@ -1,23 +1,9 @@
-# 假设当前已经打出的牌为 '777888'，表示一个三顺
-from app.models.play import PredictPutCardModel
-from app.utils.utils import DataTransformer, get_gt_cards,get_landlord_score,playable_cards_from_hand
-from app.utils.predict import Predict
+from app.utils.pklord_ai import PklordAI
+from app.models.play import PredictPutCardModel, PlayableCardsModel
 
-
-# played_cards = '777888'
-
-# current_hand = '999TTTAAKK'
-
-# gt_cards = get_gt_cards(played_cards, current_hand)
-# print(gt_cards)
-# score = get_landlord_score(current_hand)
-# print(score)
-# playable_cards = playable_cards_from_hand(current_hand)
-# print(list(playable_cards))
-
-if __name__ == "__main__":
-    # 构造示例数据
-    data = {
+def test_play_cards():
+    # 准备测试数据
+    test_data = {
         "current_hand": "77889TTQ22B",
         "fundcards": "9TJ",
         "init_card": "577889TTQQKKKK22B",
@@ -42,11 +28,13 @@ if __name__ == "__main__":
         "landlord_seat": 0
     }
 
-    predict_model = PredictPutCardModel(**data)
-    best_action = Predict.play_cards(predict_model)
-    print(best_action)
-    # result = DataTransformer.transform(predict_model)
+    try:
+        # 调用play_cards方法
+        result = PklordAI.play_cards(test_data)
+        print("测试结果:")
+        print(result)
+    except Exception as e:
+        print(f"测试出错: {e}")
 
-    # # 输出结果
-    # import json
-    # print(json.dumps(result, ensure_ascii=False, indent=4))
+if __name__ == "__main__":
+    test_play_cards()

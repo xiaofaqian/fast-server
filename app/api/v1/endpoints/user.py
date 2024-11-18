@@ -12,35 +12,81 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 @router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_200_OK)
 async def register(user_data: UserCreate):
-    try:
-        user_service = UserService()
-        user = await user_service.create_user(
-            username=user_data.username,
-            password=user_data.password
-        )
-        return RegisterResponse(
-            code=200,
-            msg="User registered successfully",
-            data={
-                "_id": str(user.id),
-                "username": user.username,
-                "points": user.points,
-                "is_active": user.is_active
+    """用户注册接口
+    
+    Args:
+        user_data (UserCreate): {
+            "username": str,  # 用户名
+            "password": str   # 密码
+        }
+    
+    Returns:
+        RegisterResponse: {
+            "code": 200,
+            "msg": "User registered successfully",
+            "data": {
+                "_id": str,  # 用户ID
+                "username": str,  # 用户名
+                "points": int,  # 积分
+                "is_active": bool  # 是否激活
             }
-        )
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+        }
+    
+    Raises:
+        HTTPException 400: 注册参数无效
+        HTTPException 500: 服务器内部错误
+    """
+    # try:
+    user_service = UserService()
+    user = await user_service.create_user(
+        username=user_data.username,
+        password=user_data.password
+    )
+    return RegisterResponse(
+        code=200,
+        msg="User registered successfully",
+        data={
+            "_id": str(user.id),
+            "username": user.username,
+            "points": user.points,
+            "is_active": user.is_active
+        }
+    )
+    # except ValueError as e:
+    #     raise HTTPException(
+    #         status_code=status.HTTP_400_BAD_REQUEST,
+    #         detail=str(e)
+    #     )
+    # except Exception as e:
+    #     raise HTTPException(
+    #         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    #         detail=str(e)
+    #     )
 
 @router.post("/login", response_model=LoginResponse)
 async def login(form_data: UserCreate):
+    """用户登录接口
+    
+    Args:
+        form_data (UserCreate): {
+            "username": str,  # 用户名
+            "password": str   # 密码
+        }
+    
+    Returns:
+        LoginResponse: {
+            "code": 200,
+            "msg": "Login successful",
+            "data": {
+                "access_token": str,  # JWT访问令牌
+                "token_type": str  # 令牌类型
+            }
+        }
+    
+    Raises:
+        HTTPException 401: 用户名或密码错误
+        HTTPException 500: 服务器内部错误
+    """
     try:
         user_service = UserService()
         user = await user_service.authenticate_user(form_data.username, form_data.password)
@@ -66,6 +112,30 @@ async def login(form_data: UserCreate):
 
 @router.get("/me", response_model=UserResponse)
 async def get_user_profile(current_user: User = Depends(get_current_user)):
+    """获取当前用户信息
+    
+    Args:
+        current_user (User): 当前登录用户信息，由 OAuth2 认证提供
+    
+    Returns:
+        UserResponse: {
+            "code": 200,
+            "msg": "Success",
+            "data": {
+                "_id": str,  # 用户ID
+                "username": str,  # 用户名
+                "points": int,  # 积分
+                "is_active": bool,  # 是否激活
+                "is_superuser": bool,  # 是否超级用户
+                "is_admin": bool,  # 是否管理员
+                "created_at": datetime,  # 创建时间
+                "updated_at": datetime  # 更新时间
+            }
+        }
+    
+    Raises:
+        HTTPException 500: 服务器内部错误
+    """
     try:
         return UserResponse(
             code=200,
@@ -78,7 +148,9 @@ async def get_user_profile(current_user: User = Depends(get_current_user)):
                 is_superuser=current_user.is_superuser,
                 is_admin=current_user.is_admin,
                 created_at=current_user.created_at,
-                updated_at=current_user.updated_at
+                updated_at=current_user.updated_at,
+                current_total_up_points = current_user.current_total_up_points,
+                current_total_down_points = current_user.current_total_down_points
             )
         )
     except Exception as e:
@@ -90,6 +162,23 @@ async def get_user_profile(current_user: User = Depends(get_current_user)):
 
 @router.get("/points", response_model=ResponseModel)
 async def get_user_points(current_user: User = Depends(get_current_user)):
+    """获取当前用户积分
+    
+    Args:
+        current_user (User): 当前登录用户信息，由 OAuth2 认证提供
+    
+    Returns:
+        ResponseModel: {
+            "code": 200,
+            "msg": "Success",
+            "data": {
+                "points": int  # 用户当前积分
+            }
+        }
+    
+    Raises:
+        HTTPException 500: 服务器内部错误
+    """
     try:
         return ResponseModel(
             code=200,
@@ -101,3 +190,23 @@ async def get_user_points(current_user: User = Depends(get_current_user)):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+
+
+@router.post("/clearRecord")
+async def clearRecord(
+    current_user: User = Depends(get_current_user)
+):
+    """
+    清除用户当前统计
+    """
+    try:
+        result = await UserService.clearRecord(current_user)
+        if result:
+            return ResponseModel(
+                    code=200,
+                    msg="Success",
+                )
+        else:
+            raise HTTPException(status_code=400, detail="重设记录失败")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))    

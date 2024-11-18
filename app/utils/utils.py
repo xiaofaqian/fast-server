@@ -5,7 +5,9 @@ import os
 import json
 from collections import Counter, OrderedDict, defaultdict
 import threading
+import time
 from typing import Dict, List
+import uuid
 
 import numpy as np
 
@@ -65,6 +67,65 @@ REVERSE_CARD_MAP = {v: k for k, v in CARD_MAP.items()}
 # 按照牌的排名顺序排序
 INDEX = OrderedDict(sorted(CARD_RANK_STR_INDEX.items(), key=lambda t: t[1]))
 
+
+async def generate_unique_task_id(db) -> str:
+    """
+    处理用户账单和任务相关的服务类
+    """
+    while True:
+        task_id = uuid.uuid4().hex + uuid.uuid4().hex[:16]
+        existing_task = await db.user_tasks.find_one({"task_id": task_id})
+        if not existing_task:
+            return task_id
+
+# 获取当前时间戳（毫秒级）
+def get_current_timestamp():
+    """
+    获取当前时间戳（毫秒级）
+
+    返回:
+        int: 当前时间戳（毫秒级）
+    """
+    return int(round(time.time() * 1000))
+
+def convert_card_format(card_str: str) -> str:
+    """
+    将各种牌面格式转换为标准格式
+
+    参数:
+        card_str (str): 需要转换的牌面字符串，例如 "10,10", "10"
+
+    返回:
+        str: 转换后的标准牌面字符串，例如 "TT", "T"
+    """
+    # 定义转换映射
+    convert_map = {
+        '3': '3',
+        '4': '4',
+        '5': '5',
+        '6': '6',
+        '7': '7',
+        '8': '8',
+        '9': '9',
+        '10': 'T',
+        'J': 'J',
+        'Q': 'Q', 
+        'K': 'K',
+        'A': 'A',
+        '2': '2',
+        'X': 'B',  # 小王
+        'D': 'R'   # 大王
+    }
+
+    # 处理逗号分隔的情况
+    if ',' in card_str:
+        parts = card_str.split(',')
+        converted_parts = [convert_map.get(part, part) for part in parts]
+        return ''.join(converted_parts)
+
+    # 处理单个数字的情况
+    return convert_map.get(card_str, card_str)
+
 def get_reverse_card_map(card_id:int):
     return REVERSE_CARD_MAP[card_id]
 
@@ -74,7 +135,7 @@ def get_card_type(card:str):
     '''
     return CARD_TYPE[card]
 
-def get_card_str_by_action_id(action_id:int,card_list:list[str]):
+def get_card_str_by_action_id(action_id:int,card_list:List[str]):
     '''
         根据动作ID获取卡牌字符串
     '''
@@ -152,6 +213,8 @@ def get_gt_cards(played_cards, current_hand):
     :param current_hand: 玩家当前手牌的字符串表示
     :return: 可以比当前出牌更大的卡牌组合列表，包含 'pass'
     """
+    if not played_cards or played_cards == "" or played_cards == "pass":
+        return playable_cards_from_hand(current_hand)
     gt_cards = ['pass']
     target_types = CARD_TYPE[played_cards]
     type_dict = {}
@@ -172,6 +235,33 @@ def get_gt_cards(played_cards, current_hand):
                         gt_cards.append(cards)
     return gt_cards
 
+def get_bombs_rockets(current_hand: str) -> List[str]:
+    '''获取手牌中的炸弹和王炸列表
+
+    参数:
+        current_hand (str): 手牌字符串。例如: '56888TTQKKKAA222RB'
+
+    返回:
+        List[str]: 炸弹和王炸列表。例如: ['KKKK', '2222', 'BR']
+    '''
+    bombs = []
+    # 检查王炸
+    if 'B' in current_hand and 'R' in current_hand:
+        bombs.append('BR')
+        
+    # 检查普通炸弹
+    length = len(current_hand)
+    i = 0
+    while i <= length - 4:
+        # 如果连续4张牌相同，则为炸弹
+        if current_hand[i] == current_hand[i+3]:
+            bombs.append(current_hand[i] * 4)
+            i += 4
+        else:
+            i += 1
+            
+    return bombs
+
 def get_landlord_score(current_hand):
     ''' 粗略判断手牌的质量，并提供一个分数作为叫地主的依据。
 
@@ -185,13 +275,13 @@ def get_landlord_score(current_hand):
     score = 0
     # 火箭
     if current_hand[-2:] == 'BR':
-        score += 8
+        score += 3
         current_hand = current_hand[:-2]
     length = len(current_hand)
     i = 0
     while i < length:
         # 炸弹
-        if i <= (length - 4) and current_hand[i] == current_hand[i+3]:
+        if i <= (length - 4) and current_hand[i] == current_hand[i+3] and current_hand[i] not in score_map:
             score += 6
             i += 4
             continue
@@ -621,7 +711,5 @@ class DataTransformer:
         # are the ones that have not appeared yet
         other_hand_cards = list(full_deck_counter.elements())
         return other_hand_cards
-
-
 
 
