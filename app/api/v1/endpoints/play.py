@@ -1,16 +1,18 @@
+import json
 from fastapi import APIRouter,Depends
 from app.models.response import ResponseModel
 from app.models.play import PredictPutCardModel
 from app.utils.utils import get_landlord_score
 from app.utils.pklord_ai import PklordAI, PklordLocal
-from app.core.scheduler import request_queue, request_results
+#from app.core.scheduler import request_queue, request_results
 from app.services.auth_service import get_current_user
 from app.models.user import User, UserInDB
-
+from app.db.redis import get_redis
 import uuid
 router = APIRouter()
 
-
+QUEUE_KEY = "pklord_request_queue"
+RESULT_KEY = "pklord_results:"
 
 @router.get("/play/pklord/getLandlordScore", response_model=ResponseModel)
 async def getLandlordScore(current_hand: str, pk_status: int, oppo_call: int, current_user: User = Depends(get_current_user)):
@@ -25,23 +27,33 @@ async def getLandlordScore(current_hand: str, pk_status: int, oppo_call: int, cu
 
 # ,current_user: User = Depends(get_current_user)
 @router.post("/play/pklord/predictPutCard", response_model=ResponseModel)
-async def predictPutCard(data: PredictPutCardModel):
+async def predictPutCard(data: PredictPutCardModel, current_user: User = Depends(get_current_user)):
     try:
+        redis_client = get_redis() 
         # 生成唯一的请求ID
         request_id = str(uuid.uuid4())
-        
         print(f"request.pk_status: {data.pk_status}")
         
         if data.pk_status != 2:
             playable = PklordLocal.play_cards(data)
-            request_results[request_id] = {
-                "code": 200, 
-                "msg": "success", 
-                "data": playable
-            }
-        else:    
-            # 将请求放入队列
-            await request_queue.put((request_id, data))
+            # 将结果存储到Redis
+            await redis_client.setex(
+                request_id,
+                600,
+                json.dumps({
+                    "code": 200,
+                    "msg": "success",
+                    "data": playable
+                })
+            )
+        else:
+            await redis_client.lpush(
+                "REQ",
+                json.dumps({
+                    "request_id":request_id,
+                    "data":data.dict()
+                })
+            )   
         
         # 返回请求ID，客户端可以用这个ID查询结果
         return ResponseModel(code=200, msg="请求已加入处理队列", data=request_id)
@@ -51,13 +63,14 @@ async def predictPutCard(data: PredictPutCardModel):
 
 @router.get("/play/pklord/getRequestResult")
 async def getRequestResult(request_id: str):
-    # 检查请求结果是否存在
-    result = request_results.get(request_id)
-    
+
+    redis_client = get_redis() 
+    result = await redis_client.get(request_id)
     if result:
-        # 如果结果存在，删除结果（每个结果只能获取一次）
-        del request_results[request_id]
-        return result
+        result_dict = json.loads(result)
+        await redis_client.delete(request_id)
+        print(result_dict)
+        return result_dict
     else:
         return {
             "code": 404, 

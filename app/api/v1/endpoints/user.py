@@ -10,7 +10,7 @@ from app.models.user import User, UserInDB
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-@router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_200_OK)
+@router.post("/register", response_model=ResponseModel, status_code=status.HTTP_200_OK)
 async def register(user_data: UserCreate):
     """用户注册接口
     
@@ -19,49 +19,27 @@ async def register(user_data: UserCreate):
             "username": str,  # 用户名
             "password": str   # 密码
         }
-    
-    Returns:
-        RegisterResponse: {
-            "code": 200,
-            "msg": "User registered successfully",
-            "data": {
-                "_id": str,  # 用户ID
-                "username": str,  # 用户名
-                "points": int,  # 积分
-                "is_active": bool  # 是否激活
-            }
-        }
-    
+
     Raises:
         HTTPException 400: 注册参数无效
         HTTPException 500: 服务器内部错误
     """
-    # try:
-    user_service = UserService()
-    user = await user_service.create_user(
-        username=user_data.username,
-        password=user_data.password
-    )
-    return RegisterResponse(
-        code=200,
-        msg="User registered successfully",
-        data={
-            "_id": str(user.id),
-            "username": user.username,
-            "points": user.points,
-            "is_active": user.is_active
-        }
-    )
-    # except ValueError as e:
-    #     raise HTTPException(
-    #         status_code=status.HTTP_400_BAD_REQUEST,
-    #         detail=str(e)
-    #     )
-    # except Exception as e:
-    #     raise HTTPException(
-    #         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-    #         detail=str(e)
-    #     )
+    try:
+        user_service = UserService()
+        user = await user_service.create_user(
+            username=user_data.username,
+            password=user_data.password
+        )
+        return ResponseModel(
+            code=200,
+            msg="User registered successfully",
+            data=None
+        )
+    except Exception as e:
+        return ResponseModel(
+            code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            msg=str(e)
+        )
 
 @router.post("/login", response_model=LoginResponse)
 async def login(form_data: UserCreate):

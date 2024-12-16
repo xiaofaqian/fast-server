@@ -66,7 +66,7 @@ class UserService:
         try:
             # 检查用户名是否已存在
             if await self.users_collection.find_one({"username": username}):
-                raise ValueError("Username already registered")
+                raise Exception("账号已存在")
             
             now = datetime.utcnow()
             user_dict = {

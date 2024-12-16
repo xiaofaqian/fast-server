@@ -5,6 +5,7 @@ class Redis:
     client = None
 
 async def connect_to_redis():
+    print("Connected to redis.")
     Redis.client = await aioredis.from_url(
         settings.REDIS_URL,
         encoding="utf-8",
@@ -17,3 +18,4 @@ async def close_redis_connection():
 
 def get_redis():
     return Redis.client
+

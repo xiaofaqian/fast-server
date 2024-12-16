@@ -280,7 +280,8 @@ class BillsService:
         
         # 分页查询
         skip = (query_params.page - 1) * query_params.page_size
-        tasks = await db.user_tasks.find(query).skip(skip).limit(query_params.page_size).to_list(length=query_params.page_size)
+        # tasks = await db.user_tasks.find(query).skip(skip).limit(query_params.page_size).to_list(length=query_params.page_size)
+        tasks = await db.user_tasks.find(query).sort("start_time", -1).skip(skip).limit(query_params.page_size).to_list(length=query_params.page_size)
         
         # 转换为 Pydantic 模型，确保正确处理 _id
         return [UserTaskDocument(
