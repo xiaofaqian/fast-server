@@ -46,3 +46,6 @@ env/
 # Others
 .DS_Store
 
+
+# Environment
+.env
