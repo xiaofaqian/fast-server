@@ -18,5 +18,5 @@ async def main() -> None:
         await close_mongo_connection()
 
 
-if __name__ == __main__:
+if __name__ == '__main__':
     asyncio.run(main())
